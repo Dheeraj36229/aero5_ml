@@ -6,6 +6,7 @@ import numpy as np
 
 app = FastAPI()
 
+# ✅ CORS (important for app/webview)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,16 +15,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-model = joblib.load("filtration_model.pkl")
+# ✅ Lazy load model (VERY IMPORTANT for Render)
+model = None
 
+def load_model():
+    global model
+    if model is None:
+        print("Loading model...")
+        model = joblib.load("filtration_model.pkl")
+        print("Model loaded")
+
+# ✅ Request model (for POST)
 class PredictRequest(BaseModel):
     aqi: float
     breathing: float
     activity: int
 
+# ✅ Root route (to test server)
+@app.get("/")
+def home():
+    return {"status": "AERO5 API running"}
+
+# ✅ POST endpoint (for app)
 @app.post("/predict")
 def predict(data: PredictRequest):
     
+    load_model()
+
     aqi = data.aqi
     breathing = data.breathing
     activity = data.activity
@@ -51,8 +69,12 @@ def predict(data: PredictRequest):
         "warning": warning,
         "advice": advice
     }
+
+# ✅ GET endpoint (for browser / fallback)
 @app.get("/predict")
 def predict_get(aqi: float, breathing: float, activity: int):
+
+    load_model()
 
     input_data = np.array([[aqi, breathing, activity]])
     protection = float(model.predict(input_data)[0])
@@ -77,4 +99,3 @@ def predict_get(aqi: float, breathing: float, activity: int):
         "warning": warning,
         "advice": advice
     }
-    
